@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bar
+spec:
+  containers:
+  - name: bar
+    image: alpine
+    command: ["sleep"]
+    args: ["1h"]

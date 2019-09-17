@@ -1,0 +1,195 @@
+* Disclaimer
+
+Первое знакомство с Kubernetes должно начинаться, конечно, не с того,
+что такое Pod или какая-Либо другая абстракция, а что вообще такое из
+себя представляет Kubernetes. Кому и зачем он вообще нужен и нужен ли
+в принципе. Возможно необходима краткая историческая справка. Но я
+оставлю я этот вопрос или на потом или вообще не коснусь его ибо все
+из присутствующих пришли сюда добровольно и, вероятнее всего, успели
+погуглить что это и приследуют свои собственные цели.
+
+* Pod и что он из себя представляет
+
+В первую очередь, когда мы говорим Pod, имея некоторый опыт в Docker
+мы подразумеваем контейнер, в котором запущено одно или несколько
+приложений, но есть нюансы. О них я скажу далее. В первую очерень нам
+надо запомнить, что Pod в Kubernetes это минимальная контейнерная
+величина в Kubernetes, базовый кирпичик, который создается и умирает
+исключительно целиком, этот обьект предоставляется нам API Kubernetes
+и оперировать меньшими частями мы не в силах.
+
+** Отличия от Docker-контейнера
+
+Почему бы нам не назвать Pod используя терминологию из Docker:
+"контейнер"? Мы не можем сделать это по нескольким причинам.
+
+Для людей мало знакомым с Docker постараюсь дать вводную кратко -
+Docker-контейнер это запущенный экземляр образа, мы можем переносить
+Docker-образ с нашим приложением и данными между машинами, загружать
+его в удаленное хранилище (реестр образов Docker) для долгосрочного
+хранения, когда мы запускаем образ мы получаем контейнер, в котором
+можем выполнять любые желаемые нами команды.
+
+Итак, отличия Pod'а-Kubernetes от Docker-контейнера: Pod это группа
+контейнеров (группа из одного контейнера как частный случай)
+
+** Что дает нам Pod
+
+Хорошей практикой в Docker является запуск одного приложения на
+контейнер. При этом Docker не дает нам никакой возможности описать
+зависимость между контейнерами (порядок запуска, перезагрузка группы
+в случае остановки одного из контейнеров, группировка при выполнении
+запросов (хотя это можно сделать))
+
+Когда наше приложение разделено между несколькими контейнерами, чаще
+всего требуется доступ из одного контейнера в другой. Pod позволяет
+описать это взаимодейстивие. Это может быть общая директория или
+TCP-соединение. И тут Kubernetes нас сразу ставит перед данностью, что
+контейнеры, запущенные в рамках одного пода имеют общий localhost,
+т.е. запустить два Nginx в рамках пода на одном порту у нас не
+получится.
+
+А при смерти одного из контейнеров у нас умирает pod целиком.
+
+** Как создаются pod'ы?
+
+Pod'ы как и любые другие ресурсы Kubernetes создаются запросом в API.
+От нас остается только сделать этот запрос. Мы можем сделать это двумя
+путями: вызовом kubectl c указанием необходимых параметров,
+если что-то надо сделать единоразово и быстро (но лучше бы не спешить)
+или передачей файла-манифеста с описанием ресурса в формате yaml или
+json
+
+** Создание простейшего pod через kubectl
+
+#+BEGIN_EXAMPLE
+$ kubectl run --generator=run-pod/v1 --image=alpine foo sleep 1h
+#+END_EXAMPLE
+
+Взглянем на запущенный под
+
+#+BEGIN_EXAMPLE
+$ kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+foo    1/1     Running   0          7s
+#+END_EXAMPLE
+
+Статус нам намекат что все хорошо, и это не может не радовать
+
+** Создание простейшего pod из файла-манифеста
+
+Тут уже немного сложнее, для начала нам потребуется создать файл
+00-bar.yaml (название может быть любым)
+
+И наполнить его следующим содержимым:
+
+#+BEGIN_EXAMPLE
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bar
+spec:
+  containers:
+  - name: bar
+    image: alpine
+    command: ["sleep"]
+    args: ["1h"]
+#+END_EXAMPLE
+
+Проверим список подов теперь:
+
+#+BEGIN_EXAMPLE
+$ kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+bar    1/1     Running   0          6s
+foo    1/1     Running   0          9m53s
+#+END_EXAMPLE
+
+Отлично! Теперь у нас два пода, но что с ними можно делать дальше?
+
+** Эксплуатация
+
+Когда наше приложение запущено в Kubernetes в рамках одного Pod нам
+необходимо знать как обслуживать и отлаживать наше новоиспеченное
+приложение, с этим нам может помочь несколько полезных команд
+
+Получение логов из контейнера:
+#+BEGIN_EXAMPLE
+$ kubectl logs bar
+#+END_EXAMPLE
+
+Запуск приложения в контейнере в интерактивном режиме с захватом
+STDIN:
+#+BEGIN_EXAMPLE
+$ kubectl exec -it bar sh
+/ #
+#+END_EXAMPLE
+
+Получение полной информации о запущенном pod:
+#+BEGIN_EXAMPLE
+Name:         bar
+Namespace:    default
+Priority:     0
+Node:         247152.local/188.225.47.246
+Start Time:   Wed, 18 Sep 2019 00:34:11 +0300
+Labels:       <none>
+Annotations:  cni.projectcalico.org/podIP: 192.168.234.96/32
+              kubectl.kubernetes.io/last-applied-configuration:
+                {"apiVersion":"v1","kind":"Pod","metadata":{"annotations":{},"name":"bar","namespace":"default"},"spec":{"containers":[{"args":["1h"],"com...
+Status:       Running
+IP:           192.168.234.96
+Containers:
+  bar:
+    Container ID:  docker://4ffd83ea4d94c98cb34cde38b138d4861950d8ee0a52623c88de092466548a50
+    Image:         alpine
+    Image ID:      docker-pullable://alpine@sha256:72c42ed48c3a2db31b7dafe17d275b634664a708d901ec9fd57b1529280f01fb
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sleep
+    Args:
+      1h
+    State:          Running
+      Started:      Wed, 18 Sep 2019 00:34:15 +0300
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-mmz7p (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+Volumes:
+  default-token-mmz7p:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-mmz7p
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type    Reason     Age    From                   Message
+  ----    ------     ----   ----                   -------
+  Normal  Scheduled  10m    default-scheduler      Successfully assigned default/bar to 247152.local
+  Normal  Pulling    9m58s  kubelet, 247152.local  Pulling image "alpine"
+  Normal  Pulled     9m56s  kubelet, 247152.local  Successfully pulled image "alpine"
+  Normal  Created    9m56s  kubelet, 247152.local  Created container bar
+  Normal  Started    9m55s  kubelet, 247152.local  Started container bar
+#+END_EXAMPLE
+
+Остановка запущенного pod:
+#+BEGIN_EXAMPLE
+$ kubectl delete pod bar
+pod "bar" deleted
+#+END_EXAMPLE
+
+** Проблемы подобного Podхода
+
+Обновить подобный контейнер без простоя - невозможно, между
+перезапусками неизбежной пройдет время, которое заменят пользователи
+и явно не одобрят. Но у Kubernetes на это есть ответ в виде абстракций
+более высокого уровня.
