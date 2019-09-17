@@ -26,6 +26,9 @@
   - Создание из файла-манифеста
   - Эксплуатация
   - Недостатки
+* Deployment
+  - Создание из файла-манифеста
+  - Эксплуатация
 
                                             2/4
 
@@ -94,3 +97,95 @@ $ kubectl delete pod bar
 -------------------------------------------------
 
 -> # Проблемы подобного Podхода <-
+
+-------------------------------------------------
+
+-> # ReplicaSet <-
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ cat <<EOF > 01-bar.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: bar
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: bar
+        image: alpine
+        command: ["/bin/sh"]
+        args: ["-c", "trap 'exit 0' 15;while true; do exec sleep 100 & wait $!; done"]
+EOF
+
+$ kubectl apply -f 01-bar.yaml
+```
+
+-------------------------------------------------
+
+-> # Эксплуатация <-
+
+```
+$ kubectl scale replicaset bar --replicas=5
+
+$ kubectl delete replicaset bar
+```
+
+-------------------------------------------------
+
+-> # Недостатки <-
+
+-------------------------------------------------
+
+-> # Deployment <-
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ cat <<EOF > 02-bar.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bar
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: bar
+        image: alpine
+        command: ["/bin/sh"]
+        args: ["-c", "trap 'exit 0' 15;while true; do exec sleep 100 & wait $!; done"]
+EOF
+
+$ kubectl apply -f 02-bar.yaml
+```
+
+-------------------------------------------------
+
+-> # Эксплуатация <-
+
+```
+$ kubectl scale deployment bar --replicas=5
+
+$ kubectl delete deployment bar
+```

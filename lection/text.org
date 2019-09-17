@@ -271,3 +271,84 @@ $ kubectl delete replicaset bar
 доступным при потере какой-либо ноды кластера мы все равно на данный
 момент не можем провести обновление, которое бы осталось незаметным
 для наших воображаемых клиентов
+
+* Deployment
+
+Этот ресурс уже лишен всех недостатков перечисленных ранее, при
+изменении конфигурации контейнеров данного ресурса по-умолчанию
+начнется плавная (rollout) замена каждого из реплики на новую версию
+пока каждая реплика не станет актуальной версией
+
+** Создание из файла-манифеста
+
+Создадим файл 02-bar.yaml следующего содержания:
+#+BEGIN_EXAMPLE
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bar
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: bar
+        image: alpine
+        command: ["/bin/sh"]
+        args: ["-c", "trap 'exit 0' 15;while true; do exec sleep 100 & wait $!; done"]
+#+END_EXAMPLE
+
+Применим манифест:
+#+BEGIN_EXAMPLE
+$ kubectl apply -f 02-bar.yaml
+#+END_EXAMPLE
+
+И проверим теперь список подов:
+
+#+BEGIN_EXAMPLE
+$ kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+bar-65dbfbcf46-fjmwj   1/1     Running   0          5m18s
+bar-65dbfbcf46-mcv5j   1/1     Running   0          5m18s
+bar-65dbfbcf46-wb8s6   1/1     Running   0          5m18s
+#+END_EXAMPLE
+
+Попробуем изменить образ с alpine на debian:stable-slim
+
+#+BEGIN_EXAMPLE
+$ sed -i 's/alpine/debian:stable-slim/g' 02-bar.yam
+$ kubectl apply -f 02-bar.yaml
+deployment.apps/bar configured
+$ kubectl get pods
+NAME                   READY   STATUS              RESTARTS   AGE
+bar-65dbfbcf46-fjmwj   1/1     Running             0          7m13s
+bar-65dbfbcf46-mcv5j   1/1     Running             0          7m13s
+bar-65dbfbcf46-wb8s6   1/1     Running             0          7m13s
+bar-68c6b49ffc-mvqfk   0/1     ContainerCreating   0          4s
+
+# Некоторое время спустя
+
+$ kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+bar-68c6b49ffc-5lm9l   1/1     Running   0          54s
+bar-68c6b49ffc-mvqfk   1/1     Running   0          65s
+bar-68c6b49ffc-nkw55   1/1     Running   0          61s
+#+END_EXAMPLE
+
+** Эксплуатация
+
+В любой момент времени мы можем отмасштабировать наш Deployment:
+#+BEGIN_EXAMPLE
+$ kubectl scale deployment bar --replicas=5
+#+END_EXAMPLE
+
+Удаление Deployment:
+#+BEGIN_EXAMPLE
+$ kubectl delete deployment bar
+#+END_EXAMPLE
