@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: bar
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: bar
+        image: alpine
+        command: ["/bin/sh"]
+        args: ["-c", "trap 'exit 0' 15;while true; do exec sleep 100 & wait $!; done"]

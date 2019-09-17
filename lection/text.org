@@ -198,3 +198,76 @@ pod "bar" deleted
 Pod хоть и состоит из множества контейнеров, но при этом они могут
 находиться одновременно только на одной машине кластера, поэтому
 горизонтальное масштабирование в данном случае нам так же не доступно
+
+* ReplicaSet
+
+ReplicaSet - это группа из множества Pod'ов которые мы можем
+масштабировать вверх или вниз в любой момент времени всего одной
+командой. Контроллер, который отвечает за ReplicaSet автоматически
+сгенерирует уникальные имена подов а Kubernetes распределит запущенные
+реплики по машинам оптимальным образом без нашего участия.
+
+** Создание из файла-манифеста
+
+Создадим файл 01-bar.yaml следующего содержания:
+#+BEGIN_EXAMPLE
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: bar
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: bar
+        image: alpine
+        command: ["/bin/sh"]
+        args: ["-c", "trap 'exit 0' 15;while true; do exec sleep 100 & wait $!; done"]
+#+END_EXAMPLE
+
+Применим манифест:
+#+BEGIN_EXAMPLE
+$ kubectl apply -f 01-bar.yaml
+#+END_EXAMPLE
+
+И проверим теперь список подов:
+
+#+BEGIN_EXAMPLE
+$ kubectl get pods
+NAME        READY   STATUS    RESTARTS   AGE
+bar         1/1     Running   1          39m
+bar-78mnv   1/1     Running   0          12s
+bar-f675p   1/1     Running   0          12s
+bar-w688v   1/1     Running   0          12s
+foo         1/1     Running   1          74m
+#+END_EXAMPLE
+
+Как видим, теперь наше приложение имеет 3 реплики, что вероятнее всего
+обрадует наших воображаемых клиентов заментно возросшим uptime
+
+** Эксплуатация
+
+В любой момент времени мы можем отмасштабировать наш ReplicaSet:
+
+#+BEGIN_EXAMPLE
+$ kubectl scale replicaset bar --replicas=5
+#+END_EXAMPLE
+
+И, разумеется, удалить
+#+BEGIN_EXAMPLE
+$ kubectl delete replicaset bar
+#+END_EXAMPLE
+
+** Недостатки
+
+Хоть теперь наше приложение может масштабироваться и останется
+доступным при потере какой-либо ноды кластера мы все равно на данный
+момент не можем провести обновление, которое бы осталось незаметным
+для наших воображаемых клиентов
