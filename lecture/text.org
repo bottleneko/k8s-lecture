@@ -485,7 +485,6 @@ Service как ресурс в рамках Kubernetes отвечает за е�
 Service я предлагаю чуть позже, а пока просто знать и помнить что он
 существует, очень скоро он нам понадобится
 
-```
 #+END_EXAMPLE
 apiVersion: v1
 kind: Service
@@ -498,4 +497,111 @@ spec:
   clusterIP: None
   selector:
     app: qux
+#+END_EXAMPLE
+
+* StatefulSet
+
+StatefulSet - это почти как Deployment, только с состоянием
+
+** Создание из файла-манифеста
+
+Создадим файл 04-bar-service.yaml сдедующего содержания:
+
+#+BEGIN_EXAMPLE
+apiVersion: v1
+kind: Service
+metadata:
+  name: bar
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: bar
+#+END_EXAMPLE
+
+И файл 04-bar.yaml сдедующего содержания:
+
+#+BEGIN_EXAMPLE
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bar
+spec:
+  selector:
+    matchLabels:
+      app: bar
+  replicas: 2
+  serviceName: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: nginx
+        image: nginxdemos/hello:plain-text
+        volumeMounts:
+        - name: bar
+          mountPath: /pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: bar
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+#+END_EXAMPLE
+
+Посмотрим список pod'ов:
+
+#+BEGIN_EXAMPLE
+root@247152:~# kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+bar-0   1/1     Running   0          6m12s
+bar-1   1/1     Running   0          4m30s
+#+END_EXAMPLE
+
+Теперь мы можем проверить как работает Service с нашим ReplicaSet:
+
+#+BEGIN_EXAMPLE
+$ kubectl run --generator=run-pod/v1 --image=alpine test sleep 1h
+pod/test created
+$ kubectl exec -it test sh
+/ # apk add --no-cache curl
+fetch http://dl-cdn.alpinelinux.org/alpine/v3.10/main/x86_64/APKINDEX.tar.gz
+fetch http://dl-cdn.alpinelinux.org/alpine/v3.10/community/x86_64/APKINDEX.tar.gz
+(1/4) Installing ca-certificates (20190108-r0)
+(2/4) Installing nghttp2-libs (1.39.2-r0)
+(3/4) Installing libcurl (7.66.0-r0)
+(4/4) Installing curl (7.66.0-r0)
+Executing busybox-1.30.1-r2.trigger
+Executing ca-certificates-20190108-r0.trigger
+OK: 7 MiB in 18 packages
+/ # curl bar
+Server address: 192.168.234.114:80
+Server name: bar-1
+Date: 18/Sep/2019:05:55:16 +0000
+URI: /
+Request ID: e31f3fb14ff1cf8264d684bedc2c0200
+/ # curl bar
+Server address: 192.168.234.113:80
+Server name: bar-0
+Date: 18/Sep/2019:05:55:17 +0000
+URI: /
+Request ID: 97fc549c450ef1360a966eb92af1f8f3
+#+END_EXAMPLE
+
+** Эксплуатация
+
+В любой момент времени мы можем отмасштабировать наш Deployment:
+#+BEGIN_EXAMPLE
+$ kubectl scale statefulset bar --replicas=5
+#+END_EXAMPLE
+
+Удаление Deployment:
+#+BEGIN_EXAMPLE
+$ kubectl delete statefulset bar
 #+END_EXAMPLE

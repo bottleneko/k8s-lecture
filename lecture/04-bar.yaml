@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bar
+spec:
+  selector:
+    matchLabels:
+      app: bar
+  replicas: 2
+  serviceName: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+    spec:
+      containers:
+      - name: nginx
+        image: nginxdemos/hello:plain-text
+        volumeMounts:
+        - name: bar
+          mountPath: /pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: bar
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
