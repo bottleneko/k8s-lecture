@@ -82,6 +82,12 @@
 $ kubectl run --generator=run-pod/v1 --image=alpine foo sleep 1h
 ```
 
+```
+$ kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+foo    1/1     Running   0          7s
+```
+
 -------------------------------------------------
 
 -> # Создание простейшего pod из файла-манифеста <-
