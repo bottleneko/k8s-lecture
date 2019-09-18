@@ -29,6 +29,11 @@
 * Deployment
   - Создание из файла-манифеста
   - Эксплуатация
+* PersistentVolumeClaim
+  - Создание из файла-манифеста
+  - Использование в Pod
+  - Эксплуатация
+  - Недостатки
 
                                             2/4
 
@@ -189,3 +194,69 @@ $ kubectl scale deployment bar --replicas=5
 
 $ kubectl delete deployment bar
 ```
+
+-------------------------------------------------
+
+-> # PersistentVolumeClaim <-
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ cat <<EOF > 03-baz-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: baz
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 2Gi
+EOF
+
+$ kubectl apply -f 03-baz-pvc.yaml
+```
+
+-------------------------------------------------
+
+-> # Использование в Pod <-
+
+```
+$ cat <<EOF > 03-baz.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: baz
+spec:
+  containers:
+    - name: baz
+      image: alpine
+      command: ["/bin/sh"]
+      args: ["-c", "trap 'exit 0' 15;while true; do exec sleep 100 & wait $!; done"]
+      volumeMounts:
+        - mountPath: "/pvc"
+          name: baz
+  volumes:
+    - name: baz
+      persistentVolumeClaim:
+        claimName: baz
+EOF
+
+$ kubectl apply -f 03-baz.yaml
+```
+
+-------------------------------------------------
+
+-> # Эксплуатация <-
+
+```
+$ kubectl get pvc
+```
+
+-------------------------------------------------
+
+-> # Недостатки <-

@@ -352,3 +352,115 @@ $ kubectl scale deployment bar --replicas=5
 #+BEGIN_EXAMPLE
 $ kubectl delete deployment bar
 #+END_EXAMPLE
+
+* PersistentVolumeClaim
+
+У всего перечисленного выше есть не то чтобы недостаток, скорее
+ограничение: при перезапуске контейнера мы теряем все данные внутри.
+Это не проблема для stateless-сервисов, но когда речь заходит за базу
+данных или файлы загружаемые пользователем (stateful-сервисы) нам
+необходимо где-то хранить эти данные. В Kubernetes это самая сложная
+тема, к счастью с ней столкнутся только те, кто решил развернуть свой
+кластер на BareMetal в остальных случаях эту проблему берет на себя
+облачный провайдер
+
+** Создание из файла-манифеста
+
+Создадим файл 03-baz-pvc.yaml следующего содержания:
+#+BEGIN_EXAMPLE
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: baz
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 2Gi
+#+END_EXAMPLE
+
+Coздадим и проверим статус PersistentVolumeClaim
+
+#+BEGIN_EXAMPLE
+$ kubectl apply -f 03-baz-pvc.yaml
+persistentvolumeclaim/baz created
+$ kubectl get pvc
+NAME   STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+baz    Bound    pv0001   2Gi        RWO                           7s
+#+END_EXAMPLE
+
+** Использование в Pod
+
+Создадим файл 03-baz.yaml следующего содержания:
+
+#+BEGIN_EXAMPLE
+apiVersion: v1
+kind: Pod
+metadata:
+  name: task-pv-pod
+spec:
+  volumes:
+    - name: task-pv-storage
+      persistentVolumeClaim:
+        claimName: task-pv-claim
+  containers:
+    - name: task-pv-container
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: task-pv-storage
+#+END_EXAMPLE
+
+Попробуем применить этот манифест и проверить, что бы теперь
+действительно можем хранить состояние между перезапусками контейнера
+
+#+BEGIN_EXAMPLE
+$ kubectl apply -f 03-baz.yaml
+pod/baz created
+$ kubectl exec baz ls -- -la /pvc
+total 8
+drwxr-xr-x    2 root     root          4096 Sep 18 04:18 .
+drwxr-xr-x    1 root     root          4096 Sep 18 04:22 ..
+$ kubectl exec baz touch -- /pvc/test
+$ kubectl exec baz ls -- -la /pvc
+total 8
+drwxr-xr-x    2 root     root          4096 Sep 18 04:24 .
+drwxr-xr-x    1 root     root          4096 Sep 18 04:23 ..
+-rw-r--r--    1 root     root             0 Sep 18 04:24 test
+$ kubectl exec baz kill -- 1
+$ kubectl get pods
+NAME   READY   STATUS      RESTARTS   AGE
+baz    0/1     Completed   0          2m41s
+
+# Чуть позже
+
+$ kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+baz    1/1     Running   1          2m46s
+$ kubectl exec baz ls -- -la /pvc
+total 8
+drwxr-xr-x    2 root     root          4096 Sep 18 04:24 .
+drwxr-xr-x    1 root     root          4096 Sep 18 04:24 ..
+-rw-r--r--    1 root     root             0 Sep 18 04:24 test
+#+END_EXAMPLE
+
+** Эксплуатация
+
+Получение списка PersistentVolumeClaim:
+#+BEGIN_EXAMPLE
+$ kubectl get pvc
+
+NAME   STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+baz    Bound    pv0001   2Gi        RWO                           4h59m
+#+END_EXAMPLE
+
+** Недостатки
+
+К сожалению данный подход имеет все недостатки одиночного подхода в
+виде проблем с масштабированием, отказоустойчивостью и наличием
+простоя при обновлении контейнера
