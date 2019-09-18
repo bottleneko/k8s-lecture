@@ -605,3 +605,80 @@ $ kubectl scale statefulset bar --replicas=5
 #+BEGIN_EXAMPLE
 $ kubectl delete statefulset bar
 #+END_EXAMPLE
+
+* Ingress
+
+Ingress в Kubernetes это ресурс который связывает наш сервис с
+доменным именем и открывает доступ к нему из внешней сети. Именно
+Ingress позволит нашим воображаемым клиентам обращаться к сервису не
+через curl внутри одного из контейнеров во внутренней сети а из
+внешнего мира.
+
+** Создание из файла-манифеста
+
+Создадим файл 05-bar.yaml следующего содержания
+
+#+BEGIN_EXAMPLE
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: bar
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: bar.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: bar
+          servicePort: 80
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+$ kubectl apply -f 05-bar.yaml
+ingress.networking.k8s.io/bar created
+#+END_EXAMPLE
+
+** Тестирование
+
+Теперь мы можем с любой машины сделать запрос и получить ответ,
+который ранее мы получали из внутренней сети
+
+#+BEGIN_EXAMPLE
+$ curl bar.kubernetes-cluster.ru
+Server address: 192.168.234.114:80
+Server name: bar-1
+Date: 18/Sep/2019:16:36:49 +0000
+URI: /
+Request ID: 730fad0ffc846fdb46c41dfaa6a9cd47
+$ curl bar.kubernetes-cluster.ru
+Server address: 192.168.234.113:80
+Server name: bar-0
+Date: 18/Sep/2019:16:36:53 +0000
+URI: /
+Request ID: 13ca2d835ef9f3f38091a1e5aa8e059b
+#+END_EXAMPLE
+
+** Эксплуатация
+
+Удаление Ingress:
+#+BEGIN_EXAMPLE
+$ kubectl delete ingress bar
+ingress.extensions "bar" deleted
+#+END_EXAMPLE
+
+** Недостатки
+
+На самом деле ресурс Ingress это интерфейс к Ingress-контроллеру,
+которых существует великое множество. В данном случае мы использовали
+Nginx-Ingress. Каждый созданный нами Ingress вызывает перегенерацию
+конфига Nginx на добавление нового Virtual Server. Ingress в кластере,
+который поставляется клиентам как услуга такой подход не годится, ибо
+либой клиент может занять любое виртуальное имя хоста (кто первый
+занял имя, в его сервис и будет внешний запрос). А так же никто не
+может управлять доменными именами ибо у нас используется только один
+IP-адрес, правильным решением будет создание ресурса LoadBalancer,
+который под выполняет запрос к внешней системе для выделения
+IP-адреса, но это совсем другой уровень и совсем другая история

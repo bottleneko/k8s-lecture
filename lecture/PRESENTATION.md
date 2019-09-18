@@ -16,7 +16,7 @@
   - Эксплуатация
   - Проблемы подобного Podхода
 
-                                            1/4
+                                            1/3
 
 -------------------------------------------------
 
@@ -35,7 +35,7 @@
   - Эксплуатация
   - Недостатки
 
-                                            2/4
+                                            2/3
 
 -------------------------------------------------
 
@@ -47,8 +47,13 @@
   - Создание из файла-манифеста
   - Тестирование
   - Эксплуатация
+* Ingress
+  - Создание из файла-манифеста
+  - Тестирование
+  - Эксплуатация
+* Итоги
 
-                                            3/4
+                                            3/3
 
 -------------------------------------------------
 
@@ -362,4 +367,61 @@ Request ID: 97fc549c450ef1360a966eb92af1f8f3
 $ kubectl scale statefulset bar --replicas=5
 
 $ kubectl delete statefulset bar
+```
+
+-------------------------------------------------
+
+-> # Ingress <-
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ cat <<EOF > 05-bar.yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: bar
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: bar.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: bar
+          servicePort: 80
+EOF
+
+$ kubectl apply -f 05-bar.yaml
+```
+
+-------------------------------------------------
+
+-> # Тестирование <-
+
+```
+$ curl bar.kubernetes-cluster.ru
+Server address: 192.168.234.114:80
+Server name: bar-1
+Date: 18/Sep/2019:16:36:49 +0000
+URI: /
+Request ID: 730fad0ffc846fdb46c41dfaa6a9cd47
+$ curl bar.kubernetes-cluster.ru
+Server address: 192.168.234.113:80
+Server name: bar-0
+Date: 18/Sep/2019:16:36:53 +0000
+URI: /
+Request ID: 13ca2d835ef9f3f38091a1e5aa8e059b
+```
+
+-------------------------------------------------
+
+-> # Эксплуатация <-
+
+```
+$ kubectl delete ingress bar
 ```
