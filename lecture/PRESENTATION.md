@@ -31,6 +31,7 @@
   - Недостатки
 * Deployment
   - Создание из файла-манифеста
+  - Обновление
   - Эксплуатация
 * PersistentVolumeClaim
   - Создание из файла-манифеста
@@ -106,6 +107,11 @@ spec:
 EOF
 
 $ kubectl apply -f 00-bar.yaml
+
+$ kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+bar    1/1     Running   0          6s
+foo    1/1     Running   0          9m53s
 ```
 
 -------------------------------------------------
@@ -160,6 +166,24 @@ EOF
 $ kubectl apply -f 01-bar.yaml
 ```
 
+                                            1/2
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ kubectl get pods
+NAME        READY   STATUS    RESTARTS   AGE
+bar         1/1     Running   1          39m
+bar-78mnv   1/1     Running   0          12s
+bar-f675p   1/1     Running   0          12s
+bar-w688v   1/1     Running   0          12s
+foo         1/1     Running   1          74m
+```
+
+                                            2/2
+
 -------------------------------------------------
 
 -> # Эксплуатация <-
@@ -206,6 +230,45 @@ spec:
 EOF
 
 $ kubectl apply -f 02-bar.yaml
+```
+
+                                            1/2
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+bar-65dbfbcf46-fjmwj   1/1     Running   0          5m18s
+bar-65dbfbcf46-mcv5j   1/1     Running   0          5m18s
+bar-65dbfbcf46-wb8s6   1/1     Running   0          5m18s
+#+END_EXAMPLE
+```
+
+                                            2/2
+
+-------------------------------------------------
+
+-> # Обновление Deployment'а <-
+
+```
+$ sed -i 's/alpine/debian:stable-slim/g' 02-bar.yaml
+$ kubectl apply -f 02-bar.yaml
+deployment.apps/bar configured
+$ kubectl get pods
+NAME                   READY   STATUS              RESTARTS   AGE
+bar-65dbfbcf46-fjmwj   1/1     Running             0          7m13s
+bar-65dbfbcf46-mcv5j   1/1     Running             0          7m13s
+bar-65dbfbcf46-wb8s6   1/1     Running             0          7m13s
+bar-68c6b49ffc-mvqfk   0/1     ContainerCreating   0          4s
+
+$ kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+bar-68c6b49ffc-5lm9l   1/1     Running   0          54s
+bar-68c6b49ffc-mvqfk   1/1     Running   0          65s
+bar-68c6b49ffc-nkw55   1/1     Running   0          61s
 ```
 
 -------------------------------------------------
@@ -272,6 +335,47 @@ EOF
 $ kubectl apply -f 03-baz.yaml
 ```
 
+                                            1/3
+
+-------------------------------------------------
+
+-> # Использование в Pod <-
+
+```
+total 8
+drwxr-xr-x    2 root     root          4096 Sep 18 04:18 .
+drwxr-xr-x    1 root     root          4096 Sep 18 04:22 ..
+$ kubectl exec baz touch -- /pvc/test
+$ kubectl exec baz ls -- -la /pvc
+total 8
+drwxr-xr-x    2 root     root          4096 Sep 18 04:24 .
+drwxr-xr-x    1 root     root          4096 Sep 18 04:23 ..
+-rw-r--r--    1 root     root             0 Sep 18 04:24 test
+$ kubectl exec baz kill -- 1
+$ kubectl get pods
+NAME   READY   STATUS      RESTARTS   AGE
+baz    0/1     Completed   0          2m41s
+```
+
+                                            2/3
+
+-------------------------------------------------
+
+-> # Использование в Pod <-
+
+```
+$ kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+baz    1/1     Running   1          2m46s
+$ kubectl exec baz ls -- -la /pvc
+total 8
+drwxr-xr-x    2 root     root          4096 Sep 18 04:24 .
+drwxr-xr-x    1 root     root          4096 Sep 18 04:24 ..
+-rw-r--r--    1 root     root             0 Sep 18 04:24 test
+```
+
+                                            3/3
+
 -------------------------------------------------
 
 -> # Эксплуатация <-
@@ -283,6 +387,31 @@ $ kubectl get pvc
 -------------------------------------------------
 
 -> # Недостатки <-
+
+-------------------------------------------------
+
+-> # Service <-
+
+-------------------------------------------------
+
+-> # Создание из файла-манифеста <-
+
+```
+$ cat <<EOF > 04-bar-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bar
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: bar
+
+$ kubectl apply -f 04-bar-service.yaml
+```
 
 -------------------------------------------------
 
@@ -315,7 +444,6 @@ spec:
 -------------------------------------------------
 
 -> # Создание из файла-манифеста <-
-
 
 ```
     spec:
