@@ -96,6 +96,10 @@ spec:
     args: ["1h"]
 #+END_EXAMPLE
 
+#+BEGIN_EXAMPLE
+$ kubectl apply -f 00-bar.yaml
+#+END_EXAMPLE
+
 Проверим список подов теперь:
 
 #+BEGIN_EXAMPLE
@@ -397,23 +401,16 @@ baz    Bound    pv0001   2Gi        RWO                           7s
 
 #+BEGIN_EXAMPLE
 apiVersion: v1
-kind: Pod
+kind: PersistentVolumeClaim
 metadata:
-  name: task-pv-pod
+  name: baz
 spec:
-  volumes:
-    - name: task-pv-storage
-      persistentVolumeClaim:
-        claimName: task-pv-claim
-  containers:
-    - name: task-pv-container
-      image: nginx
-      ports:
-      - containerPort: 80
-          name: "http-server"
-      volumeMounts:
-        - mountPath: "/usr/share/nginx/html"
-          name: task-pv-storage
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 2Gi
 #+END_EXAMPLE
 
 Попробуем применить этот манифест и проверить, что бы теперь
