@@ -1,0 +1,259 @@
+* Вступление
+
+На лекции мы познакомились с базовыми абстракциями Kubernetes, сегодня
+нашей задачей является применить полученные знания на практике.
+Желательно с пользой, но это как получится.
+
+После лекции поступило предложение засунуть в Kubernetes приложение
+roundcube https://roundcube.net. Для нас на данном этапе это вполне
+посильная задача, которая мало отдает синтетикой и возможно послужит
+вдохновением для наших коллег из ОСА :)
+
+Roundcube состоит из frontend-части на PHP и требует наличия одной из
+популярныйх СУБД для хранения своих данных. Мы пойдем по пути
+наименьшего сопротивления и поэтому создадим отдельный Pod для MySQL и
+отдельный Pod с самим roundcube.
+
+* Создание Pod для MySQL
+
+Для начала найдем необходимый образ, который впоследствии мы будем
+превращать в Kubernetes Pod. Образ https://hub.docker.com/_/mysql нам
+вполне подойдет.
+
+Напишем минимальный манифест для Pod'а обращаясь к официальной
+документации: https://dev.mysql.com/doc/refman/8.0/en/docker-mysql-more-topics.html#docker_var_mysql_database
+
+#+BEGIN_SRC yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  containers:
+  - name: mysql
+    image: mysql:8.0
+    command: ["docker-entrypoint.sh", "mysqld", "--default-authentication-plugin=mysql_native_password"]
+    ports:
+    - containerPort: 3306
+    env:
+    - name: MYSQL_DATABASE
+      value: roundcubemail
+    - name: MYSQL_USER
+      value: roundcube
+    - name: MYSQL_PASSWORD
+      value: "123456789"
+
+    - name: MYSQL_ROOT_PASSWORD
+      value: "123456789"
+#+END_SRC
+
+* Создание Service для MySQL
+
+Прежде чем мы создадим Pod для roundcube стоит заметить очевидную
+вещь, что roundcube должен как-то обращаться к MySQL, если более
+конкретно, то по hostname. На данный момент этот контейнер в кластере
+по внутреннему DNS не резолвится. Для резолвинга нам необходимо
+создать ресурс Service
+
+#+BEGIN_SRC yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  selector:
+    app: mysql
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+#+END_SRC
+
+Теперь по имени mysql у нас будет резолвиться наш Pod с MySQL
+
+* Создание пода roundcube
+
+Теперь нам вновь необходимо найти подходящий образ Docker Hub,
+официальный образ вполне подойдет: https://hub.docker.com/r/roundcube/roundcubemail/
+
+Сверяясь с документацией к образу напишем манифест Pod'а, в котором
+будут содержаться необходимые переменные окружения.
+
+#+BEGIN_SRC yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: roundcube
+  labels:
+    app: roundcube
+spec:
+  containers:
+  - name: roundcube
+    image: roundcube/roundcubemail
+    env:
+    - name: ROUNDCUBEMAIL_DB_TYPE
+      value: mysql
+    - name: ROUNDCUBEMAIL_DB_HOST
+      value: mysql
+    - name: ROUNDCUBEMAIL_DB_PORT
+      value: "3306"
+    - name: ROUNDCUBEMAIL_DB_USER
+      value: roundcube
+    - name: ROUNDCUBEMAIL_DB_PASSWORD
+      value: "123456789"
+
+    - name: ROUNDCUBEMAIL_DEFAULT_HOST
+      value: imap.timeweb.ru
+    - name: ROUNDCUBEMAIL_SMTP_SERVER
+      value: smtp.timeweb.ru
+    - name: ROUNDCUBEMAIL_SMTP_PORT
+#+END_SRC
+
+* Создание Service для roundcube
+
+Для доступа к roundcube нам необходим сервис, иначе все, на что мы
+сейчас можем рассчитывать это запуск bash внутри Pod'а и вызов curl
+
+#+BEGIN_SRC yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: roundcube
+spec:
+  selector:
+    app: roundcube
+  clusterIP: None
+  ports:
+  - name: web
+    port: 80
+    targetPort: 80
+#+END_SRC
+
+Теперь мы можем вызывать curl из любого другого контейнера, но это же
+не то, ради чего мы это делали, верно?
+
+* Создание Ingress для roundcube
+
+Создадим ingress для доступа к сервису извне. Но так как домен второго
+уровня у нас на всех общий, то попрошу вас назначать host по шаблону,
+чтобы не усложнаять жизнь без необходимости себе и другим:
+
+{{ логин использовашийся для входа по SSH }}.kubernetes-cluster.ru
+
+#+BEGIN_SRC yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: roundcube
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: roundcube.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: roundcube
+          servicePort: 80
+
+#+END_SRC
+
+Теперь по домену указанному в spec.rules.host мы можем получить наш
+собственноручно развернутый roundcube, поздравляю.
+
+* Создание Certificate для roundcube
+
+Представим, что я не ставил сниффер перед вашими экземплярами сервиса
+(а это достаточно легко представить, ведь я не делал этого). Но
+все-таки попрошу не спешить с попыткой утентификации под своим
+корпоративным email и включить TLS. Я заранее подготовил все
+необходимое для выпуска сертификатов от Let's Encrypt, поэтому сейчас
+сделать все необходимое будет достаточно просто. Достаточно создать
+ресурс Certificate, который является пользовательским расширением
+API Kubernetes от cert-manager: https://github.com/jetstack/cert-manager
+
+#+BEGIN_SRC yaml
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: roundcube
+spec:
+  secretName: roundcube
+  commonName: roundcube.kubernetes-cluster.ru
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+#+END_SRC
+
+После того как мы успешно создали сертификат... А мы точно успешно
+создали сертификат?
+
+Давайте проверим
+
+#+BEGIN_EXAMPLE
+$ kubectl describe certificate roundcube
+
+Name:         roundcube
+Namespace:    default
+Labels:       <none>
+Annotations:  kubectl.kubernetes.io/last-applied-configuration:
+                {"apiVersion":"certmanager.k8s.io/v1alpha1","kind":"Certificate","metadata":{"annotations":{},"name":"roundcube","namespace":"default"},"s...
+API Version:  certmanager.k8s.io/v1alpha1
+Kind:         Certificate
+Metadata:
+  Creation Timestamp:  2019-09-22T17:44:40Z
+  Generation:          4
+  Resource Version:    2455620
+  Self Link:           /apis/certmanager.k8s.io/v1alpha1/namespaces/default/certificates/roundcube
+  UID:                 0d71a5f3-cbf7-4425-ba44-4a6d11907083
+Spec:
+  Common Name:  roundcube.kubernetes-cluster.ru
+  Issuer Ref:
+    Kind:       ClusterIssuer
+    Name:       letsencrypt
+  Secret Name:  roundcube
+Status:
+  Conditions:
+    Last Transition Time:  2019-09-22T17:45:18Z
+    Message:               Certificate is up to date and has not expired
+    Reason:                Ready
+    Status:                True
+    Type:                  Ready
+  Not After:               2019-12-21T16:45:17Z
+Events:                    <none>
+#+END_EXAMPLE
+
+Кажется что все хорошо. Осталось только воспользоваться им.
+
+* Создание TLS Ingress для roundcube
+
+Изменим наш Ingress для использования ресурса Secret, созданного после
+заказа сертификата ресурсом Certificate.
+
+#+BEGIN_SRC yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: roundcube
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  tls:
+  - hosts:
+    - roundcube.kubernetes-cluster.ru
+    secretName: roundcube
+  rules:
+  - host: roundcube.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: roundcube
+          servicePort: 80
+#+END_SRC
+
+Теперь можно со спокойной душой проверить свой roundcube.
