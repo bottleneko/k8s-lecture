@@ -24,4 +24,3 @@ spec:
       value: imap.timeweb.ru
     - name: ROUNDCUBEMAIL_SMTP_SERVER
       value: smtp.timeweb.ru
-    - name: ROUNDCUBEMAIL_SMTP_PORT
