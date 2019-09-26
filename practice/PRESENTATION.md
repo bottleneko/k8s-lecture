@@ -45,6 +45,7 @@
 
 -> # Создание Pod для MySQL <-
 
+> https://hub.docker.com/_/mysql
 > practice/00-pod-mysql.yaml
 
 ```
@@ -90,6 +91,8 @@ spec:
 
 -> # Создание Service для MySQL <-
 
+> 01-service-mysql.yaml
+
 ```
 apiVersion: v1
 kind: Service
@@ -104,3 +107,53 @@ spec:
     port: 3306
     targetPort: 3306
 ```
+
+-------------------------------------------------
+
+-> # Создание пода roundcube <-
+
+> https://hub.docker.com/r/roundcube/roundcubemail/
+> 02-pod-roundcube.yaml
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: roundcube
+  labels:
+    app: roundcube
+spec:
+  containers:
+  - name: roundcube
+    image: roundcube/roundcubemail
+...
+```
+
+                                            1/2
+
+-------------------------------------------------
+
+-> # Создание пода roundcube <-
+
+```
+...
+    env:
+    - name: ROUNDCUBEMAIL_DB_TYPE
+      value: mysql
+    - name: ROUNDCUBEMAIL_DB_HOST
+      value: mysql
+    - name: ROUNDCUBEMAIL_DB_PORT
+      value: "3306"
+    - name: ROUNDCUBEMAIL_DB_USER
+      value: roundcube
+    - name: ROUNDCUBEMAIL_DB_PASSWORD
+      value: "123456789"
+    - name: ROUNDCUBEMAIL_DEFAULT_HOST
+      value: imap.timeweb.ru
+    - name: ROUNDCUBEMAIL_SMTP_SERVER
+      value: smtp.timeweb.ru
+```
+
+                                            2/2
+
+-------------------------------------------------
