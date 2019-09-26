@@ -200,3 +200,22 @@ spec:
           serviceName: roundcube
           servicePort: 80
 ```
+
+-------------------------------------------------
+
+-> # Создание Certificate для roundcube <-
+
+> 05-certificate-roundcube.yaml
+
+```
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: roundcube
+spec:
+  secretName: roundcube
+  commonName: roundcube.kubernetes-cluster.ru
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+```
