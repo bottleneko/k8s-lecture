@@ -219,3 +219,49 @@ spec:
     name: letsencrypt
     kind: ClusterIssuer
 ```
+
+-------------------------------------------------
+
+-> # Создание TLS Ingress для roundcube <-
+
+> 06-ingress-tls-roundcube.yaml
+
+```
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: roundcube
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+...
+```
+
+                                            1/2
+
+-------------------------------------------------
+
+-> # Создание TLS Ingress для roundcube <-
+
+> 06-ingress-tls-roundcube.yaml
+
+```
+...
+  tls:
+  - hosts:
+    - roundcube.kubernetes-cluster.ru
+    secretName: roundcube
+  rules:
+  - host: roundcube.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: roundcube
+          servicePort: 80
+
+```
+
+                                            2/2
+
+-------------------------------------------------
