@@ -157,3 +157,22 @@ spec:
                                             2/2
 
 -------------------------------------------------
+
+-> # Создание Service для roundcube <-
+
+> 03-service-roundcube.yaml
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: roundcube
+spec:
+  selector:
+    app: roundcube
+  clusterIP: None
+  ports:
+  - name: web
+    port: 80
+    targetPort: 80
+```
