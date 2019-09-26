@@ -45,6 +45,8 @@
 
 -> # Создание Pod для MySQL <-
 
+> practice/00-pod-mysql.yaml
+
 ```
 apiVersion: v1
 kind: Pod
@@ -78,7 +80,6 @@ spec:
       value: roundcube
     - name: MYSQL_PASSWORD
       value: "123456789"
-
     - name: MYSQL_ROOT_PASSWORD
       value: "123456789"
 ```
@@ -86,3 +87,20 @@ spec:
                                             2/2
 
 -------------------------------------------------
+
+-> # Создание Service для MySQL <-
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  selector:
+    app: mysql
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+```
