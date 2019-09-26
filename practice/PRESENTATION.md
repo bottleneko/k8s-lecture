@@ -265,3 +265,61 @@ spec:
                                             2/2
 
 -------------------------------------------------
+
+-> # Масштабируем roundcube <-
+
+-------------------------------------------------
+
+-> # ReplicaSet <-
+
+> 07-replicaset-roundcube.yaml
+
+```
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: roundcube
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: roundcube
+  template:
+    metadata:
+      labels:
+        app: roundcube
+    spec:
+...
+```
+
+                                            1/2
+
+-------------------------------------------------
+
+-> # ReplicaSet <-
+
+```
+...
+      containers:
+      - name: roundcube
+        image: roundcube/roundcubemail
+        env:
+        - name: ROUNDCUBEMAIL_DB_TYPE
+          value: mysql
+        - name: ROUNDCUBEMAIL_DB_HOST
+          value: mysql
+        - name: ROUNDCUBEMAIL_DB_PORT
+          value: "3306"
+        - name: ROUNDCUBEMAIL_DB_USER
+          value: roundcube
+        - name: ROUNDCUBEMAIL_DB_PASSWORD
+          value: "123456789"
+        - name: ROUNDCUBEMAIL_DEFAULT_HOST
+          value: imap.timeweb.ru
+        - name: ROUNDCUBEMAIL_SMTP_SERVER
+          value: smtp.timeweb.ru
+```
+
+                                            2/2
+
+-------------------------------------------------
