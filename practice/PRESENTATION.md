@@ -323,3 +323,30 @@ spec:
                                             2/2
 
 -------------------------------------------------
+
+-> # Чиним roundcube <-
+
+> 08-ingress-roundcube-session-affinity.yaml
+
+```
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: roundcube
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/affinity: cookie
+spec:
+  tls:
+  - hosts:
+    - roundcube.kubernetes-cluster.ru
+    secretName: roundcube
+  rules:
+  - host: roundcube.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: roundcube
+          servicePort: 80
+```
