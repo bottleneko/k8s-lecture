@@ -408,3 +408,79 @@ spec:
 ```
 
                                             2/2
+
+-------------------------------------------------
+
+-> # Не забываем о важном <-
+
+> 10-pvc-mysql.yaml
+
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 2Gi
+```
+
+                                            1/3
+
+-------------------------------------------------
+
+-> # Не забываем о важном <-
+
+> 11-pod-mysql-with-pvc.yaml
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  containers:
+  - name: mysql
+    image: mysql:8.0
+    command:
+    - "docker-entrypoint.sh"
+    - "mysqld"
+    - "--default-authentication-plugin=mysql_native_password"
+    ports:
+    - containerPort: 3306
+...
+```
+
+                                            2/3
+
+-------------------------------------------------
+
+-> # Не забываем о важном <-
+
+```
+...
+    env:
+    - name: MYSQL_DATABASE
+      value: roundcubemail
+    - name: MYSQL_USER
+      value: roundcube
+    - name: MYSQL_PASSWORD
+      value: "123456789"
+    - name: MYSQL_ROOT_PASSWORD
+      value: "123456789"
+    volumeMounts:
+    - name: mysql
+      mountPath: "/var/lib/mysql"
+  volumes:
+  - name: mysql
+    persistentVolumeClaim:
+      claimName: mysql
+```
+
+                                            3/3
