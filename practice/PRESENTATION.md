@@ -176,3 +176,27 @@ spec:
     port: 80
     targetPort: 80
 ```
+
+-------------------------------------------------
+
+-> # Создание Ingress для roundcube <-
+
+> 04-ingress-roundcube
+
+```
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: roundcube
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: roundcube.kubernetes-cluster.ru
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: roundcube
+          servicePort: 80
+```
