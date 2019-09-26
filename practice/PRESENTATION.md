@@ -484,3 +484,83 @@ spec:
 ```
 
                                             3/3
+
+-------------------------------------------------
+
+-> # Последние штрихи в MySQL <-
+
+> 12-statefulset-mysql.yaml
+
+```
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  replicas: 1
+  serviceName: mysql
+...
+```
+
+                                            1/3
+
+-------------------------------------------------
+
+-> # Последние штрихи в MySQL <-
+
+```
+...
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        command:
+        - "docker-entrypoint.sh"
+        - "mysqld"
+        - "--default-authentication-plugin=mysql_native_password"
+        ports:
+        - containerPort: 3306
+...
+```
+
+                                            2/3
+
+-------------------------------------------------
+
+
+```
+        env:
+        - name: MYSQL_DATABASE
+          value: roundcubemail
+        - name: MYSQL_USER
+          value: roundcube
+        - name: MYSQL_PASSWORD
+          value: "123456789"
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456789"
+        volumeMounts:
+        - name: mysql
+          mountPath: "/var/lib/mysql"
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      volumeMode: Filesystem
+      resources:
+        requests:
+          storage: 2Gi
+```
+
+                                            3/3
+
+-------------------------------------------------
+
+-> # Подводим итоги <-
